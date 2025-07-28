@@ -1,0 +1,66 @@
+.content {
+    margin-top: 3.6rem;
+    padding: 20px;
+    font-family: "Arial", sans-serif;
+    line-height: 1.6;
+    color: white;
+    border-radius: 8px;
+    margin-left: 50px;
+
+  }
+
+.content>p{
+  color: #333;
+}
+  
+  h1, h2 {
+    color:#006666;
+  }
+  
+  h1 {
+    font-size: 28px;
+    margin-bottom: 20px;
+  }
+  
+  h2 {
+    font-size: 22px;
+    margin-top: 20px;
+  }
+  
+  p, ul {
+    font-size: 16px;
+    margin-bottom: 15px;
+  }
+  
+  ul {
+    list-style: disc;
+    padding-left: 20px;
+  }
+  
+  .last-updated {
+    font-style: italic;
+    text-align:start;
+    color: #555;
+  }
+  
+  .contact-info p {
+    font-size: 16px;
+  }
+  
+
+  .content {
+    padding: 10px;
+    font-size: 16px;
+    color: #333;
+    line-height: 1.6;
+  }
+  
+
+  @media screen and (max-width:600px) {
+    .content {
+    margin-left: 15px;
+  }
+
+  }
+
+  

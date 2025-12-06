@@ -5,6 +5,8 @@ import Papa from "papaparse";
 import CryptoJS from "crypto-js";
 import { EdubukContexts } from "../../Context/EdubukContext";
 import SmallLoader from "../SmallLoader/SmallLoader";
+import { getReferralTag, submitReferral } from "@divvi/referral-sdk";
+const consumerAddress = process.env.REACT_APP_DIVVI_CONSUMER || "0x177073570f9ac28aec0074340e193a3a71454aea";
 
 const BulkUpload = () => {
   const [selectedFile, setSelectedFile] = useState(null);
@@ -19,7 +21,6 @@ const BulkUpload = () => {
   const [data, setData] = useState([]);
   const [count, setCount] = useState(0);
   const [csvfile, setCSVFile] = useState();
-  const [docCount, setDocCount] = useState(null);
 
   // function to handle input file
   const handleFileChange = (e) => {
@@ -186,13 +187,33 @@ const BulkUpload = () => {
       setLoading(true);
       const contract = await connectingWithContract();
       // console.log("contract", contract);
-      const tx = await contract.bulkUpload(data, issuerName);
-      await tx.wait();
-      if(tx?.hash)
-      {
-        setTxHash(tx.hash);
+      const iface = contract.interface;
+      const callData = iface.encodeFunctionData("bulkUpload", [data, issuerName]);
+
+      const tag = getReferralTag({ user: account, consumer: consumerAddress });
+      const dataWithReferral = `${callData}${tag}`;
+
+      const signer = contract.signer;
+      const txResponse = await signer.sendTransaction({
+        to: contract.address,
+        data: dataWithReferral,
+      });
+      await txResponse.wait();
+      if (txResponse?.hash) {
+        setTxHash(txResponse.hash);
         setLoading(false);
         toast.success("Certificated Posted successfully");
+      }
+
+      try {
+        const provider = signer.provider;
+        const network = await provider.getNetwork();
+        await submitReferral({
+          txHash: txResponse.hash,
+          chainId: Number(network.chainId),
+        });
+      } catch (refErr) {
+        console.error("Divvi referral submission failed:", refErr);
       }
       setIssuerName("");
       setCount(0);

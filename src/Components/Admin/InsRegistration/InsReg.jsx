@@ -3,6 +3,8 @@ import "../admin.css";
 import { EdubukContexts } from "../../../Context/EdubukContext";
 import toast from "react-hot-toast";
 import SmallLoader from "../../SmallLoader/SmallLoader";
+import { getReferralTag, submitReferral } from "@divvi/referral-sdk";
+const consumerAddress = process.env.REACT_APP_DIVVI_CONSUMER || "0x177073570f9ac28aec0074340e193a3a71454aea";
 
 const InstRegValue = {
   instName: "",
@@ -33,17 +35,39 @@ const InsReg = () => {
       setLoading(true);
       const contract = await connectingWithContract();
       console.log("contract", contract);
-      const tx = await contract.registerInstitute(
+      const iface = contract.interface;
+      const data = iface.encodeFunctionData("registerInstitute", [
         values.instName,
         values.instAcronym,
-        values.witness
-      );
-      await tx.wait();
-      if(tx?.hash)
-      {
-        setTxHash(tx.hash)
+        values.witness,
+      ]);
+
+      const tag = getReferralTag({ user: account, consumer: consumerAddress });
+      const dataWithReferral = `${data}${tag}`;
+
+      const signer = contract.signer;
+      const txResponse = await signer.sendTransaction({
+        to: contract.address,
+        data: dataWithReferral,
+      });
+      await txResponse.wait();
+      if (txResponse?.hash) {
+        setTxHash(txResponse.hash)
         setLoading(false);
         toast.success("Institute Register Successfully");
+      }
+
+      try {
+        const provider = signer.provider;
+        const network = await provider.getNetwork();
+        console.log("network", network);
+        console.log("txResponse", txResponse.hash);
+        await submitReferral({
+          txHash: txResponse.hash,
+          chainId: Number(network.chainId),
+        });
+      } catch (refErr) {
+        console.error("Divvi referral submission failed:", refErr);
       }
       setValues(InstRegValue);
     } catch (error) {

@@ -4,6 +4,8 @@ import toast from "react-hot-toast";
 import SmallLoader from "../SmallLoader/SmallLoader";
 import { EdubukContexts } from "../../Context/EdubukContext";
 import CryptoJS from "crypto-js";
+import { getReferralTag, submitReferral } from "@divvi/referral-sdk";
+const consumerAddress = process.env.REACT_APP_DIVVI_CONSUMER || "0x177073570f9ac28aec0074340e193a3a71454aea";
 
 const regCertValue = {
   studentName: "",
@@ -20,7 +22,6 @@ const PostCert = () => {
   const [inputFile, setInputFile] = useState();
   const [txHash, setTxHash] = useState(null);
   const [uploadLoader, setUploadLoader] = useState(false);
-  const [isNewRegistration, setNewRegistration] = useState(false);
   //upload docs to IPFS
   const uploadToIpfs = async (e) => {
     e.preventDefault();
@@ -63,7 +64,6 @@ const PostCert = () => {
   //generate hash of a file
   const getHash = (file) => {
     const reader = new FileReader();
-
     reader.onload = (e) => {
       const fileData = e.target.result;
       const wordArray = CryptoJS.lib.WordArray.create(fileData);
@@ -89,27 +89,52 @@ const PostCert = () => {
     try {
       setLoading(true);
       const contract = await connectingWithContract();
-      const tx = await contract.postCertificate(
+      const iface = contract.interface;
+      const data = iface.encodeFunctionData("postCertificate", [
         values.studentName,
         values.studentAdd?.trim(),
         uri,
         fileHash,
         values.certType,
-        values.issuerName
-      );
+        values.issuerName,
+      ]);
+
+      const tag = getReferralTag({
+        user: account,
+        consumer: consumerAddress,
+      });
+
+      const dataWithReferral = `${data}${tag}`;
+
+      const signer = contract.signer;
+      const txResponse = await signer.sendTransaction({
+        to: contract.address,
+        data: dataWithReferral,
+      });
       setLoading(true);
-      await tx.wait();
-      if(tx?.hash)
-      {
-        setTxHash(tx?.hash);
+      await txResponse.wait();
+      if (txResponse?.hash) {
+        setTxHash(txResponse.hash);
         setLoading(false);
         toast.success("Certificated Posted successfully");
+      }
+
+      try {
+        const provider = signer.provider;
+        const network = await provider.getNetwork();
+        console.log("network", network);
+        console.log("txResponse", txResponse.hash);
+        await submitReferral({
+          txHash: txResponse.hash,
+          chainId: Number(network.chainId),
+        });
+      } catch (refErr) {
+        console.error("Divvi referral submission failed:", refErr);
       }
       setValues(regCertValue);
       setUri(null);
       setInputFile(null);
       setFileHash(null);
-      setNewRegistration(true);
     } catch (error) {
       setLoading(false);
       toast.error(error?.data?.message);
